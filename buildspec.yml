@@ -1,0 +1,17 @@
+version: 0.2
+
+phases: 
+  install:
+    runtime-versions:
+      python: 3.8
+    commands:
+      - pip install cfn-lint taskcat
+  build:
+    commands:
+      - echo "Bắt đầu build..."
+      - cfn-lint modules/main.yaml
+      - echo "Bắt đầu Taskcat tests..."
+      - taskcat test run
+artifacts:
+  files:
+    - modules/*.yaml

@@ -1,0 +1,82 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Main CloudFormation template
+
+Parameters:
+  BucketName:
+    Type: String
+    Description: this is the name of the S3 bucket 
+    Default: my-cloudformation-templates-bucket-111
+  VpcCidr:
+    Type: String
+    Default: 10.0.0.0/16
+  PublicSubnetCidr:
+    Type: String
+    Default: 10.0.1.0/24
+  PrivateSubnetCidr:
+    Type: String
+    Default: 10.0.2.0/24
+  KeyName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Default: sshkey
+  AmiId:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/canonical/ubuntu/server/22.04/stable/current/amd64/hvm/ebs-gp2/ami-id
+
+Resources:
+  VPCStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "https://${BucketName}.s3.${AWS::Region}.amazonaws.com/modules/vpc.yaml"
+      Parameters:
+        VpcCidr: !Ref VpcCidr
+        PublicSubnetCidr: !Ref PublicSubnetCidr
+        PrivateSubnetCidr: !Ref PrivateSubnetCidr
+
+  NATStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "https://${BucketName}.s3.${AWS::Region}.amazonaws.com/modules/nat.yaml"
+      Parameters:
+        PublicSubnetId: !GetAtt VPCStack.Outputs.PublicSubnetId
+
+  SecurityGroupStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "https://${BucketName}.s3.${AWS::Region}.amazonaws.com/modules/security_group.yaml"
+      Parameters:
+        VpcId: !GetAtt VPCStack.Outputs.VpcId
+
+  RouteTableStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "https://${BucketName}.s3.${AWS::Region}.amazonaws.com/modules/route-table.yaml"
+      Parameters:
+        VpcId: !GetAtt VPCStack.Outputs.VpcId
+        InternetGatewayId: !GetAtt VPCStack.Outputs.InternetGatewayId
+        NatGatewayId: !GetAtt NATStack.Outputs.NatGatewayId
+        PublicSubnetId: !GetAtt VPCStack.Outputs.PublicSubnetId
+        PrivateSubnetId: !GetAtt VPCStack.Outputs.PrivateSubnetId
+
+  EC2Stack:
+    Type: AWS::CloudFormation::Stack
+    DependsOn: RouteTableStack
+    Properties:
+      TemplateURL: !Sub "https://${BucketName}.s3.${AWS::Region}.amazonaws.com/modules/ec2.yaml"
+      Parameters:
+        PublicSubnetId: !GetAtt VPCStack.Outputs.PublicSubnetId
+        PrivateSubnetId: !GetAtt VPCStack.Outputs.PrivateSubnetId
+        PublicSGId: !GetAtt SecurityGroupStack.Outputs.PublicSGId
+        PrivateSGId: !GetAtt SecurityGroupStack.Outputs.PrivateSGId
+        KeyName: !Ref KeyName
+        AmiId: !Ref AmiId
+
+Outputs:
+  VpcId:
+    Description: VPC ID
+    Value: !GetAtt VPCStack.Outputs.VpcId
+  PublicSubnetId:
+    Description: Public Subnet ID
+    Value: !GetAtt VPCStack.Outputs.PublicSubnetId
+  PrivateSubnetId:
+    Description: Private Subnet ID
+    Value: !GetAtt VPCStack.Outputs.PrivateSubnetId

@@ -1,0 +1,66 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Route Table Module
+
+Parameters:
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+  InternetGatewayId:
+    Type: String
+  NatGatewayId:
+    Type: String
+  PublicSubnetId:
+    Type: AWS::EC2::Subnet::Id
+  PrivateSubnetId:
+    Type: AWS::EC2::Subnet::Id
+
+Resources:
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VpcId
+      Tags:
+        - Key: Name
+          Value: PublicRouteTable
+  
+  PublicRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGatewayId
+
+  PrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VpcId
+      Tags:
+        - Key: Name
+          Value: PrivateRouteTable
+
+  PrivateRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGatewayId
+    
+  PublicSubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnetId
+      RouteTableId: !Ref PublicRouteTable
+  
+  PrivateSubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnetId
+      RouteTableId: !Ref PrivateRouteTable
+
+Outputs:
+  PublicRouteTableId:
+    Value: !Ref PublicRouteTable
+    Description: The ID of the public route table.
+  
+  PrivateRouteTableId:
+    Value: !Ref PrivateRouteTable
+    Description: The ID of the private route table.
